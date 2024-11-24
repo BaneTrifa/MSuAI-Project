@@ -21,3 +21,13 @@ def calibrate_camera(calibration_images_path):
 
     ret, mtx, dist, _, _ = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
     return mtx, dist
+
+def create_binary_image(image):
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    sobelX = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+    abs_sobel = np.absolute(sobelX)
+    scaled_sobel = np.uint8(255 * abs_sobel / np.max(abs_sobel))
+    binary_output = np.zeros_like(scaled_sobel)
+    binary_output[(scaled_sobel >= 20) & (scaled_sobel <= 100)] = 1
+
+    return binary_output
