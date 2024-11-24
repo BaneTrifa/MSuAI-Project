@@ -1,9 +1,3 @@
-## Writeup Template
-
-### You use this file as a template for your writeup.
-
----
-
 **Lane Finding Project**
 
 The goals / steps of this project are the following:
@@ -17,35 +11,31 @@ The goals / steps of this project are the following:
 * Warp the detected lane boundaries back onto the original image.
 * Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
 
-[//]: # (Image References)
-
-[image1]: ./examples/undistort_output.png "Undistorted"
-[image2]: ./test_images/test1.jpg "Road Transformed"
-[image3]: ./examples/binary_combo_example.jpg "Binary Example"
-[image4]: ./examples/warped_straight_lines.jpg "Warp Example"
-[image5]: ./examples/color_fit_lines.jpg "Fit Visual"
-[image6]: ./examples/example_output.jpg "Output"
-[video1]: ./project_video.mp4 "Video"
-
----
-
-### Writeup / README
-
-#### 1. Provide a Writeup that includes all the rubric points and how you addressed each one.
-
-You're reading it!
-
 ### Camera Calibration
 
-#### 1. Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
+In this step, the camera calibration is performed using chessboard images. Specifically:
 
-TODO: Add your text here!!!
+1. Chessboard Corners Detection:
 
-### Pipeline (single images)
+The findChessboardCorners function from OpenCV is used to detect the inner corners of a chessboard pattern in calibration images.
+These detected corners represent the observed image points.
 
-#### 1. Provide an example of a distortion-corrected image.
+2. Object Points Generation:
 
-TODO: Add your text here!!!
+A corresponding set of 3D points in the real world (assuming the chessboard lies flat on the z=0 plane) is generated. These are referred to as object points.
+
+3. Camera Matrix and Distortion Coefficients Calculation:
+
+The calibrateCamera function is used with the object points and image points. This computes the camera matrix and distortion coefficients, which correct lens distortion.
+
+4. Distortion Correction:
+
+Using the computed matrix and coefficients, images are undistorted with cv2.undistort, removing distortion and producing geometrically accurate images.
+
+
+| Distorted  | Undistorted |
+| ------------- | ------------- |
+| ![Distorted](./camera_cal/calibration3.jpg)   | ![Undistorted](./output/undistorted_image.jpg)  |
 
 #### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
 
