@@ -57,7 +57,45 @@ The result is a binary image where lane lines are distinctly highlighted while t
 
 #### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
 
-TODO: Add your text here!!!
+In the `perspective_transform` function, a perspective transformation was applied to convert the road's trapezoidal region in the original image into a top-down, bird's-eye view. This transformation simplifies lane detection by making the lane lines appear parallel and easier to analyze.
+
+1. **Defining Source and Destination Points**:
+   - The source (`src`) points identify the trapezoidal region in the original image that captures the lane lines.
+     ```python
+     src = np.float32([[175, image.shape[0]], [900, image.shape[0]], [550, 350], [425, 350]])
+     ```
+   - The destination (`dst`) points define a rectangular region in the bird's-eye view.
+     ```python
+     dst = np.float32([[200, image.shape[0]], [900, image.shape[0]], [900, 0], [200, 0]])
+     ```
+
+2. **Computing the Transformation Matrix**:
+   - OpenCV's `cv2.getPerspectiveTransform` computes the transformation matrix to map the `src` points to the `dst` points.
+     ```python
+     matrix = cv2.getPerspectiveTransform(src, dst)
+     ```
+
+3. **Applying the Transformation**:
+   - The binary image is warped using `cv2.warpPerspective` to obtain the top-down view.
+     ```python
+     warped = cv2.warpPerspective(binary_image, matrix, img_size)
+     ```
+
+4. **Inverse Transformation**:
+   - An inverse transformation matrix is computed for projecting the detected lane lines back onto the original image.
+     ```python
+     inverse_matrix = cv2.getPerspectiveTransform(dst, src)
+     ```
+
+The function returns the warped binary image and the inverse matrix.
+You can also set display_frame parameter to see boundaries for the transformations.
+
+Below is an example of the result of the perspective transform, showing how the lane lines become parallel:
+
+| Orginal  | Warped |
+| ------------- | ------------- |
+| ![Orginal](./test_images/whiteCarLaneSwitch.jpg)   | ![Warped](./output/warped.jpg)  |
+
 
 #### 4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
 
