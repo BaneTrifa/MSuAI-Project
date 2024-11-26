@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import glob
+import matplotlib.pyplot as plt
 
 def calibrate_camera(calibration_images_path):
     objpoints = []  # 3D points in real-world space.
@@ -23,7 +24,7 @@ def calibrate_camera(calibration_images_path):
     return mtx, dist
 
 def create_binary_image(image):
-    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     sobelX = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
     abs_sobel = np.absolute(sobelX)
     scaled_sobel = np.uint8(255 * abs_sobel / np.max(abs_sobel))
@@ -58,3 +59,83 @@ def perspective_transform(image, display_frame=False):
         cv2.destroyAllWindows()
 
     return warped, inverse_matrix
+
+def detect_lane_pixels_and_fit(binary_warped):
+    histogram = np.sum(binary_warped[binary_warped.shape[0] // 2:, :], axis=0)
+    out_img = np.dstack((binary_warped, binary_warped, binary_warped)) * 255
+    midpoint = int(histogram.shape[0] // 2)
+    leftx_base = np.argmax(histogram[:midpoint])
+    rightx_base = np.argmax(histogram[midpoint:]) + midpoint
+
+    nwindows = 9
+    window_height = int(binary_warped.shape[0] // nwindows)
+    nonzero = binary_warped.nonzero()
+    nonzeroy = np.array(nonzero[0])
+    nonzerox = np.array(nonzero[1])
+    leftx_current = leftx_base
+    rightx_current = rightx_base
+    margin = 100
+    minpix = 50
+    left_lane_inds = []
+    right_lane_inds = []
+
+    for window in range(nwindows):
+        win_y_low = binary_warped.shape[0] - (window + 1) * window_height
+        win_y_high = binary_warped.shape[0] - window * window_height
+        win_xleft_low = leftx_current - margin
+        win_xleft_high = leftx_current + margin
+        win_xright_low = rightx_current - margin
+        win_xright_high = rightx_current + margin
+        
+        good_left_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) &
+                          (nonzerox >= win_xleft_low) & (nonzerox < win_xleft_high)).nonzero()[0]
+        good_right_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) &
+                           (nonzerox >= win_xright_low) & (nonzerox < win_xright_high)).nonzero()[0]
+        
+        left_lane_inds.append(good_left_inds)
+        right_lane_inds.append(good_right_inds)
+        
+        if len(good_left_inds) > minpix:
+            leftx_current = int(np.mean(nonzerox[good_left_inds]))
+        if len(good_right_inds) > minpix:
+            rightx_current = int(np.mean(nonzerox[good_right_inds]))
+
+    left_lane_inds = np.concatenate(left_lane_inds)
+    right_lane_inds = np.concatenate(right_lane_inds)
+    
+    leftx = nonzerox[left_lane_inds]
+    lefty = nonzeroy[left_lane_inds]
+    rightx = nonzerox[right_lane_inds]
+    righty = nonzeroy[right_lane_inds]
+
+    left_fit = np.polyfit(lefty, leftx, 2)
+    right_fit = np.polyfit(righty, rightx, 2)
+
+    plot_fit_lines(left_fit, right_fit, out_img)
+    
+    return cv2.imread('output/color_fit_lines.jpg')
+
+def plot_fit_lines(left_curvature, right_curvature, image):
+
+    # Image dimensions.
+    height, _, _ = image.shape
+
+    # Generate y-values (vertical positions).
+    y_values = np.linspace(0, height - 1, num=height)
+
+    # A quadratic curve: y = Ax^2 + Bx + C.
+    A_left, B_left, C_left = left_curvature
+    A_right, B_right, C_right = right_curvature
+
+    # Calculate x-values for the left and right lanes.
+    x_left = A_left * y_values**2 + B_left * y_values + C_left
+    x_right = A_right * y_values**2 + B_right * y_values + C_right
+
+    # Plot and save the image.
+    plt.imshow(image)
+    plt.plot(x_left, y_values, color='red', linewidth=5, label='Left Lane')
+    plt.plot(x_right, y_values, color='blue', linewidth=5, label='Right Lane')
+    plt.legend()
+    plt.title("Lane Curvatures on Image")
+    plt.axis("off")
+    plt.savefig('output/color_fit_lines.jpg', bbox_inches='tight', pad_inches=0, dpi=300)

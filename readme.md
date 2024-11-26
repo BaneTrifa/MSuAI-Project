@@ -35,7 +35,7 @@ Using the computed matrix and coefficients, images are undistorted with cv2.undi
 
 | Distorted  | Undistorted |
 | ------------- | ------------- |
-| ![Distorted](./camera_cal/calibration3.jpg)   | ![Undistorted](./output/undistorted_image.jpg)  |
+| ![Distorted](./camera_cal/calibration3.jpg)   | ![Undistorted](./output/undistorted.jpg)  |
 
 #### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
 
@@ -53,7 +53,7 @@ The result is a binary image where lane lines are distinctly highlighted while t
 
 | Orginal  | Binary |
 | ------------- | ------------- |
-| ![Orginal](./test_images/challange00101.jpg)   | ![Binary](./output/binary_challange00101.jpg)  |
+| ![Orginal](./test_images/whiteCarLaneSwitch.jpg)   | ![Binary](./output/binary_image.jpg)  |
 
 #### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
 
@@ -94,12 +94,45 @@ Below is an example of the result of the perspective transform, showing how the 
 
 | Orginal  | Warped |
 | ------------- | ------------- |
-| ![Orginal](./test_images/whiteCarLaneSwitch.jpg)   | ![Warped](./output/warped.jpg)  |
+| ![Orginal](./test_images/whiteCarLaneSwitch.jpg)   | ![Warped](./output/warped_image.jpg)  |
 
 
 #### 4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
 
-TODO: Add your text here!!!
+The identification of lane-line pixels and fitting their positions with a polynomial is handled in the `detect_lane_pixels_and_fit` function within the code. Here's how it works:
+
+#### Steps:
+
+1. **Histogram Analysis**:
+   - A histogram is computed for the lower half of the binary warped image:
+     ```python
+     histogram = np.sum(binary_warped[binary_warped.shape[0]//2:, :], axis=0)
+     ```
+   - The peaks of the histogram are used to locate the base positions of the left and right lanes. 
+     - The left lane base is identified by the highest peak in the left half of the histogram. 
+     - The right lane base is identified by the highest peak in the right half.
+
+2. **Sliding Window Search**:
+   - The image is divided into a predefined number of horizontal windows (`nwindows`).
+   - Starting from the base positions, a sliding window approach is used to track lane pixels through the image. Each window is defined by its boundaries in the x and y dimensions.
+   - Pixels falling within the boundaries of the left and right windows are considered part of the left and right lanes, respectively.
+
+3. **Pixel Collection**:
+   - All pixel coordinates for the left and right lanes are collected into arrays `left_lane_inds` and `right_lane_inds` by iterating through the sliding windows.
+   - These arrays are concatenated to obtain the final sets of pixel indices for both lanes:
+     ```python
+     left_lane_inds = np.concatenate(left_lane_inds)
+     right_lane_inds = np.concatenate(right_lane_inds)
+     ```
+
+4. **Polynomial Fitting**:
+   - Using the collected pixel coordinates, a second-degree polynomial is fitted to each lane using the `np.polyfit` function:
+     ```python
+     left_fit = np.polyfit(lefty, leftx, 2)
+     right_fit = np.polyfit(righty, rightx, 2)
+     ```
+
+![color_fit_lines](./output/color_fit_lines.jpg)  |
 
 #### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
