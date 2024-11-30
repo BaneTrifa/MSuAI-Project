@@ -136,11 +136,56 @@ The identification of lane-line pixels and fitting their positions with a polyno
 
 #### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
-TODO: Add your text here!!!
+The radius of curvature of the lane and the position of the vehicle relative to the center are essential metrics for determining the vehicle's alignment within the lane.
 
-#### 6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
+1. **Radius of Curvature**  
+   The radius of curvature is computed using the polynomial coefficients fitted to the detected lane lines. The curvature formula for a second-degree polynomial \( y = Ax^2 + Bx + C \) in pixel space is:  
+   \[
+   R_{\text{curve}} = \frac{(1 + (2Ay + B)^2)^{3/2}}{|2A|}
+   \]
+   Here, \( A \), \( B \), and \( C \) are the coefficients of the polynomial, and \( y \) is the vertical position in the image where the curvature is measured (usually the bottom of the image).
 
-TODO: Add your text here!!!
+   Since the lane is detected in pixel coordinates, the result must be converted to real-world dimensions. This conversion uses scaling factors for meters per pixel in both the x and y directions:
+   - \( \text{ym\_per\_pix} \): Meters per pixel in the y dimension (calculated as the real-world lane height divided by the image height).
+   - \( \text{xm\_per\_pix} \): Meters per pixel in the x dimension (calculated as the real-world lane width divided by the distance between the two detected lane lines).
+
+   The calculation is performed in the `calculate_curvature_and_position()` function:
+   ```python
+   ploty = np.linspace(0, binary_warped.shape[0] - 1, binary_warped.shape[0])
+   y_eval = np.max(ploty)  # Bottom of the image in pixel space
+   ym_per_pix = 30 / 720  # Meters per pixel in y dimension
+   xm_per_pix = 3.7 / 700  # Meters per pixel in x dimension
+
+   left_fit_cr = np.polyfit(ploty * ym_per_pix, left_fit[0] * ploty**2 + left_fit[1] * ploty + left_fit[2], 2)
+   right_fit_cr = np.polyfit(ploty * ym_per_pix, right_fit[0] * ploty**2 + right_fit[1] * ploty + right_fit[2], 2)
+
+   left_curverad = ((1 + (2 * left_fit_cr[0] * y_eval * ym_per_pix + left_fit_cr[1])**2)**1.5) / np.abs(2 * left_fit_cr[0])
+   right_curverad = ((1 + (2 * right_fit_cr[0] * y_eval * ym_per_pix + right_fit_cr[1])**2)**1.5) / np.abs(2 * right_fit_cr[0])
+   ```
+
+   The average of the left and right curvatures is used to represent the lane's curvature.
+
+2. **Vehicle Position with Respect to the Center**  
+   The vehicle's position relative to the lane center is computed based on the midpoint of the detected lane lines and the image center. Assuming the camera is mounted at the center of the vehicle, the offset can be calculated as follows:
+   - The midpoint of the left and right lane line bases (bottom of the image) gives the lane center.
+   - The image center corresponds to the vehicle's position in pixel coordinates.
+   - The difference between the image center and the lane center is converted to meters using the \( \text{xm\_per\_pix} \) scaling factor.
+
+   This is implemented as:
+   ```python
+   car_position = binary_warped.shape[1] / 2
+   lane_center_position = (left_fit[2] + right_fit[2]) / 2
+   center_dist = (car_position - lane_center_position) * xm_per_pix
+   ```
+
+3. **Return Values**  
+   The `calculate_curvature_and_position()` function returns:
+   - `left_curverad` and `right_curverad`: The curvatures of the left and right lane lines in meters.
+   - `center_dist`: The offset of the vehicle from the lane center in meters, with negative values indicating a left deviation and positive values indicating a right deviation.
+
+This step ensures accurate estimation of lane curvature and the vehicle's alignment for safe lane keeping.
+
+![Radius](./output/color_fit_lines.jpg)  |
 
 ### Pipeline (video)
 

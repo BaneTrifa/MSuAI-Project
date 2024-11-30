@@ -3,6 +3,7 @@ import numpy as np
 import glob
 import matplotlib.pyplot as plt
 
+
 def calibrate_camera(calibration_images_path):
     objpoints = []  # 3D points in real-world space.
     imgpoints = []  # 2D points in image plane.
@@ -23,6 +24,7 @@ def calibrate_camera(calibration_images_path):
     ret, mtx, dist, _, _ = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
     return mtx, dist
 
+
 def create_binary_image(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     sobelX = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
@@ -32,6 +34,7 @@ def create_binary_image(image):
     binary_output[(scaled_sobel >= 20) & (scaled_sobel <= 100)] = 1
 
     return binary_output
+
 
 def perspective_transform(image, display_frame=False):
     img_size = (image.shape[1], image.shape[0])
@@ -59,6 +62,7 @@ def perspective_transform(image, display_frame=False):
         cv2.destroyAllWindows()
 
     return warped, inverse_matrix
+
 
 def detect_lane_pixels_and_fit(binary_warped):
     histogram = np.sum(binary_warped[binary_warped.shape[0] // 2:, :], axis=0)
@@ -113,7 +117,8 @@ def detect_lane_pixels_and_fit(binary_warped):
 
     plot_fit_lines(left_fit, right_fit, out_img)
     
-    return cv2.imread('output/color_fit_lines.jpg')
+    return left_fit, right_fit, cv2.imread('output/color_fit_lines.jpg')
+
 
 def plot_fit_lines(left_curvature, right_curvature, image):
 
@@ -139,3 +144,103 @@ def plot_fit_lines(left_curvature, right_curvature, image):
     plt.title("Lane Curvatures on Image")
     plt.axis("off")
     plt.savefig('output/color_fit_lines.jpg', bbox_inches='tight', pad_inches=0, dpi=300)
+
+def calculate_curvature_and_position(binary_warped, left_fit, right_fit):
+    ploty = np.linspace(0, binary_warped.shape[0] - 1, binary_warped.shape[0])
+    y_eval = np.max(ploty)
+    ym_per_pix = 30 / 720
+    xm_per_pix = 3.7 / 700
+    left_fit_cr = np.polyfit(ploty * ym_per_pix, left_fit[0] * ploty**2 + left_fit[1] * ploty + left_fit[2], 2)
+    right_fit_cr = np.polyfit(ploty * ym_per_pix, right_fit[0] * ploty**2 + right_fit[1] * ploty + right_fit[2], 2)
+    left_curverad = ((1 + (2 * left_fit_cr[0] * y_eval * ym_per_pix + left_fit_cr[1]) ** 2) ** 1.5) / np.absolute(2 * left_fit_cr[0])
+    right_curverad = ((1 + (2 * right_fit_cr[0] * y_eval * ym_per_pix + right_fit_cr[1]) ** 2) ** 1.5) / np.absolute(2 * right_fit_cr[0])
+    car_position = binary_warped.shape[1] / 2
+    lane_center_position = (left_fit[2] + right_fit[2]) / 2
+    center_dist = (car_position - lane_center_position) * xm_per_pix
+    
+    return left_curverad, right_curverad, center_dist    
+
+def draw_lane_lines(original_image, binary_warped, lane_info, inverse_matrix):
+    left_fit, right_fit = lane_info
+    ploty = np.linspace(0, binary_warped.shape[0] - 1, binary_warped.shape[0])
+
+    left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
+    right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
+
+    warp_zero = np.zeros_like(binary_warped).astype(np.uint8)
+    color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+
+    pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
+    pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+    pts = np.hstack((pts_left, pts_right))
+
+    cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
+    newwarp = cv2.warpPerspective(color_warp, inverse_matrix, (original_image.shape[1], original_image.shape[0]))
+    result = cv2.addWeighted(original_image, 1, newwarp, 0.3, 0)
+
+    cv2.imwrite("output/detect_lane.jpg", result)
+
+    return result
+
+
+def process_video(input_video_path, output_video_path, calibration_images):
+    # Step 1: Calibrate the camera
+    print("Calibrating camera...")
+    camera_matrix, distortion_coefficients = calibrate_camera(calibration_images)
+
+    # Step 2: Open video for reading and set up for writing
+    cap = cv2.VideoCapture(input_video_path)
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_video_path, fourcc, fps, (frame_width, frame_height))
+
+    print("Processing video...")
+    i = 0
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            print("End of video or failed to read frame.")
+            break
+
+        try:
+            # Step 3: Undistort the frame
+            undistorted_frame = cv2.undistort(frame, camera_matrix, distortion_coefficients, matrix_coeffs)
+
+            # Step 4: Create a binary image
+            binary_frame = create_binary_image(undistorted_frame)
+
+            # Step 5: Perform a perspective transform
+            warped_frame, inverse_matrix = perspective_transform(binary_frame)
+
+            # Step 6: Detect lane pixels and fit polynomial
+            left_fit, right_fit, color_fit_lines_image = detect_lane_pixels_and_fit(warped_frame)
+
+            # Step 7: Calculate lane curvature and vehicle position
+            left_curverad, right_curverad, center_dist = calculate_curvature_and_position(binary_frame, left_fit, right_fit)
+
+            # Step 8: Draw lane lines on the original frame
+            output_frame = draw_lane_lines(undistorted_frame, warped_frame, (left_fit, right_fit), inverse_matrix)
+
+            # Step 9: Overlay curvature and position data
+            cv2.putText(output_frame, f"Radius of Curvature: {(left_curverad + right_curverad) / 2:.2f}m", (50, 50),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+            position_text = f"Vehicle Position: {center_dist:.2f}m {'left' if center_dist < 0 else 'right'} of center"
+            cv2.putText(output_frame, position_text, (50, 100),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+            print(i)
+            i += 1
+            if i == 100:
+                break
+            cv2.imshow("Output Frame", output_frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        except Exception as e:
+            print(f"Error processing frame: {e}")
+            continue
+
+    # Release resources
+    cap.release()
+    out.release()
+    print("Video processing complete. Output saved to", output_video_path)
