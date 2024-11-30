@@ -145,6 +145,7 @@ def plot_fit_lines(left_curvature, right_curvature, image):
     plt.axis("off")
     plt.savefig('output/color_fit_lines.jpg', bbox_inches='tight', pad_inches=0, dpi=300)
 
+
 def calculate_curvature_and_position(binary_warped, left_fit, right_fit):
     ploty = np.linspace(0, binary_warped.shape[0] - 1, binary_warped.shape[0])
     y_eval = np.max(ploty)
@@ -157,8 +158,13 @@ def calculate_curvature_and_position(binary_warped, left_fit, right_fit):
     car_position = binary_warped.shape[1] / 2
     lane_center_position = (left_fit[2] + right_fit[2]) / 2
     center_dist = (car_position - lane_center_position) * xm_per_pix
+
+    print("Left lane curvature:", left_curverad, "m")
+    print("Right lane curvature:", right_curverad, "m")
+    print("Vehicle position from center:", center_dist, "m")
     
     return left_curverad, right_curverad, center_dist    
+
 
 def draw_lane_lines(original_image, binary_warped, lane_info, inverse_matrix):
     left_fit, right_fit = lane_info
@@ -183,7 +189,8 @@ def draw_lane_lines(original_image, binary_warped, lane_info, inverse_matrix):
     return result
 
 
-def process_video(input_video_path, output_video_path, calibration_images):
+def process_video(input_video_path, matrix_coeffs, output_video_path = "output/video.mp4", calibration_images = "camera_cal/"):
+
     # Step 1: Calibrate the camera
     print("Calibrating camera...")
     camera_matrix, distortion_coefficients = calibrate_camera(calibration_images)
@@ -229,13 +236,8 @@ def process_video(input_video_path, output_video_path, calibration_images):
             position_text = f"Vehicle Position: {center_dist:.2f}m {'left' if center_dist < 0 else 'right'} of center"
             cv2.putText(output_frame, position_text, (50, 100),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
-            print(i)
-            i += 1
-            if i == 100:
-                break
-            cv2.imshow("Output Frame", output_frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+            
+            out.write(output_frame)
         except Exception as e:
             print(f"Error processing frame: {e}")
             continue

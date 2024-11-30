@@ -189,13 +189,15 @@ This step ensures accurate estimation of lane curvature and the vehicle's alignm
 
 ### Pipeline (video)
 
-#### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
-
-TODO: Add your text here!!!
+![Video](./output/video.mp4)  |
 
 ### Discussion
 
-#### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
+One of the biggest challenges I encountered was determining the appropriate `src` points for the `perspective_transform` function to successfully achieve the bird's-eye view perspective. I believe this is the main reason why the pipeline might perform poorly on some videos. The chosen `src` points may not generalize well to different scenarios, leading to inaccuracies in lane detection.
 
-TODO: Add your text here!!!
+
+
+
+
+
 
